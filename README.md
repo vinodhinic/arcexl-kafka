@@ -178,3 +178,117 @@ Note that it is not 100% kotlin. I don't want to add another learning curve here
 **It is not mandatory to stick to the module provided here**. All we need at this point, is to have an application that connects to prod/uat db based on the profile and supports read/write dao on stock_price table.  
 
 ------------ 
+
+## Recipe 2 - Setting up Kafka
+
+### Installation & Creating Brokers
+
+As few of you don't have Linux setup, I am explicitly doing Kafka Windows installation so that I can help unblock you with installation issues, if any.
+
+* Download and extract the latest kafka.
+* Open CMD and navigate to <kafka>/bin/windows
+* Execute `kafka-topics.bat` 
+    * If you see `The input line is too long. The syntax of the command is incorrect.` error, then rename you kafka folder from `kafka_2.12-2.5.0` to `kafka`
+    * Reopen CMD and try again
+* Create a folder `arcexlData` under `kafka` folder
+    * create 2 folders under  `arcexlData` - `zookeeper` and `kafka`
+    ```
+    kafka
+    |______bin
+    |______config
+    |______arcexlData
+            |________kafka
+            |________zookeeper
+    ```
+* Edit `zookeeper.properties` under `kafka/config` - Mind the forward slash
+`dataDir=C:/Users/vino/Downloads/kafka/arcexlData/zookeeper`
+*Edit `server.properties` under `kafka/config`
+`log.dirs=C:/Users/chockali/Downloads/kafka/arcexlData/kafka` 
+* Open a new CMD window and Start Zookeeper
+`C:\Users\vino\Downloads\kafka>bin\windows\kafka-server-start.bat config\server.properties`
+    * You should see that it is binding to port 2181
+    
+        ```[2020-05-17 01:23:56,813] INFO binding to port 0.0.0.0/0.0.0.0:2181 (org.apache.zookeeper.server.NIOServerCnxnFactory)```
+  
+* Open another new CMD window and Start Kafka Server
+`C:\Users\vino\Downloads\kafka>bin\windows\kafka-server-start.bat config\server.properties`
+    * Notice the ID `[2020-05-17 01:46:44,435] INFO [KafkaServer id=0] started (kafka.server.KafkaServer)`
+
+On a side note, [future versions of Kafka will not use Zookeeper](https://cwiki.apache.org/confluence/display/KAFKA/KIP-500%3A+Replace+ZooKeeper+with+a+Self-Managed+Metadata+Quorum)
+
+What you have now is a Kafka Broker.
+
+----------------
+### Creating Topics
+
+* Create a topic with name - stockPriceTopic, partitions - 3, replication-factor - 2
+    ```
+    C:\Users\vino\Downloads\kafka>bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --topic stockPriceTopic --create --partitions 3 --replication-factor 2
+    Error while executing topic command : Replication factor: 2 larger than available brokers: 1.
+    [2020-05-17 01:41:55,770] ERROR org.apache.kafka.common.errors.InvalidReplicationFactorException: Replication factor: 2 larger than available brokers: 1.
+     (kafka.admin.TopicCommand$)
+    ```
+* Notice the error message. In previous exercise you have only created 1 broker but you are asking the partitions to be replicated at 2. That's why the error. For now let's keep replication-factor=1. Note that since you are running kafka locally, increasing broker for this exercise does not make any sense. There is no point increasing brokers for resilience - if your system crashes, you will lose all brokers. 
+    ```
+   C:\Users\vino\Downloads\kafka>bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --topic stockPriceTopic --create --partitions 3 --replication-factor 1
+  Created topic stockPriceTopic.
+    ```
+* List the topics
+    ```
+     C:\Users\vino\Downloads\kafka>bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --list
+    stockPriceTopic
+    ```
+* Describe the topic. You will see buzzwords : Partition, replicationFactor, Leader, ISR (In-Sync Replicas) - we will get to it soon. Note that the leader : 0 is nothing but the `kafka-server` we ran (go back check the logs at kafka-server cmd window)
+    ```
+    C:\Users\vino\Downloads\kafka>bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --topic stockPriceTopic --describe
+    ```
+* If you are curious, figure out what it takes to increase replication factor of this topic and do that as an exercise. Hint : [Multi broker cluster](https://kafka.apache.org/quickstart#quickstart_multibroker)
+* In windows, never delete a topic. This crashes Kafka Broker and [this is a known issue.](https://issues.apache.org/jira/browse/KAFKA-1194)
+
+This concludes the installation.
+
+### Checkpoint - Broker and Topics
+
+With installation, we have seen 2 major components of Kafka - Broker and Topics
+
+* A number of Brokers makes a Kafka cluster. 
+    * Each broker is identified by an id - we saw ID : 0 in our setup.
+    * They can discover each other because of Zookeeper.
+* Topic holds the data and it can have many partitions.
+    * Broker houses Topic partitions. Eg :
+        * you have 2 brokers - B1 & B2 
+        * A topic of 3 partitions - P1, P2 & P3. 
+        * Broker B1 has [P1, P2]. 
+        * Broker B2 has [P3]
+    * Each Partition can have only one Leader and *only that leader* can receive and serve data for that partition. 
+    * If you set replication factor as n for topic, it means each partition gets replicated n times.
+        * Topic with P1, P2
+        * Broker - B1, B2
+        * Replication Factor = 2
+        * B1 has [P1, P2'] and B2 has [P2, P1']
+        * B1 is leader for P1 and B2 is syncing data from B1 for partition 1 and therefore it is an ISR - In Sync Replica
+        * B2 is leader for P2 and B1 is ISR for P2
+        * If B1 is down, then B2 can serve data. i.e B2 becomes leader for both P1 and P2
+
+_You should understand broker, topic, partition, replication factor, Leader, ISR before going to the next step._
+
+### Exercise
+
+Using the CLI Commands,
+* Create a topic - test with 3 partitions
+* Use `kafka-console-producer` to produce some messages into this topic - 1,2,3,4,...20
+    ```
+  C:\Users\vino\Downloads\kafka>bin\windows\kafka-console-producer.bat --broker-list 127.0.0.1:9092 --topic test
+    ``` 
+    * How are you able to discover broker at 9092. Hint : Look into `config/server.properties`
+    * Can you produce to a topic that does not exist? Hint : Look for `num.partitions` in server.properties file.
+* Kill the kafka-console-producer command
+* Now use `kafka-console-consumer` to consume the messages produced.
+    * Can you see the numbers you produced? No?
+    * Run the kafka-console-producer again and produce messages : 21,22,23,..25.
+    * Why can you only see from 21?
+    * Hint: `--from-beginning`
+* Why the numbers are not in order?
+    * Hint : Number of partitions you set for the test topic
+
+-------------
