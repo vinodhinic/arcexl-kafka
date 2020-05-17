@@ -34,8 +34,8 @@ public class FeedStockPriceRunnable implements StockPriceRunnable {
             if (i % 2 == 0) {
                 try {
                     // Intentionally slowing down the rate of production.
-                    LOGGER.info("Sync sleeping for every 2 price writes");
-                    Thread.sleep(3000);
+                    LOGGER.info("Sync sleeping for 300 millis every 2 price writes");
+                    Thread.sleep(300);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

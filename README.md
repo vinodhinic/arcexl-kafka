@@ -294,3 +294,61 @@ Using the CLI Commands,
     * Hint : Number of partitions you set for the test topic
 
 -------------
+
+## Overview
+
+Before we go ahead with further recipes, here is a brief overview of what we are going to build
+
+![Record-and-Replay](/docs/record_and_replay.png)
+
+1. StockPriceApp-Prod is going to read stock prices from Feeds - which is actually a csv [committed to the repo](/record-replay/src/main/resources/feeds.csv)
+1. StockPriceAdd-Prod writes these stock prices to prod-DB
+1. It also writes to stockPriceTopic at Kafka
+1. StockPriceApp-Uat is reading the stock prices from stockPriceTopic at Kafka
+1. StockPriceApp-Uat writes the stock prices read from kafka to uat-DB
+
+-------------
+
+## Recipe 3 - Producing messages into Kafka
+
+### Exercise
+* Make sure stockPriceTopic is created with 3 partitions.
+* Add an implementation for `StockPriceWriter` interface
+
+    ```
+    public interface StockPriceWriter {
+        void writeStockPrice(StockPrice stockPrice);
+    }
+    ```
+* This implementation should write to DB and then to Kafka using Kafka Producer API
+* Also, it should only write to Kafka if `writeStockPriceToKafka` property is set to true
+* At prod profile, set `writeStockPriceToKafka` to true and at uat profile, set this to false
+* Add an implementation for `StockPriceReader` interface. This implementation should read stockPrice from [feeds.csv](/record-replay/src/main/resources/feeds.csv) file. 
+
+    ```
+    public interface StockPriceReader {
+        List<StockPrice> read();
+    }
+    ```
+    * Do not waste too much time on this implementation. You need opencsv - version 5 or above - in order to parse dates to LocalDate. Copy the implementation from [FeedStockPriceReaderImpl](/record-replay/src/main/java/com/arcexl/reader/FeedStockPriceReaderImpl.java). You will also need few annotations at the [StockPrice](/record-replay/src/main/kotlin/com/arcexl/domain/StockPrice.kt) model.
+* Write a small program that reads from CSV using the `StockPriceReader` and writes to both DB and Kafka using `StockPriceWriter`
+* Use the `kafka-console-consumer` CLI to verify that the messages are produced
+
+### Focus Points
+
+* Understand synchronous and asynchronous Kafka producer API.
+* You would need Serializer and Deserializer for StockPrice. You would definitely run into issues with deserializing LocalDate. Register `com.fasterxml.jackson.datatype.jsr310.JavaTimeModule` to `ObjectMapper`
+* Add a callback and log the metadata - The message that you produced, which partition did it go to? and what is the offset?
+* First produce the messages without key.
+* Produce messages with key. Observe that messages with the same key goes to the same partition.
+* Observe that offset is increasing within the partition.
+* Are you wondering what happens when a price written to DB did not make it to Kafka? Then you are going in the right direction. Put that thought on hold for a little while. We will get there soon.
+
+### Checkpoint - Topic, Partition and Offset
+
+* Offset is meaningful only within a partition.
+* Order is guaranteed only within a partition - not across partitions.
+* Once a data is written to a partition, it cannot be changed - Immutability.
+* Data is assigned randomly to a partition, unless a key is provided.
+
+--------------

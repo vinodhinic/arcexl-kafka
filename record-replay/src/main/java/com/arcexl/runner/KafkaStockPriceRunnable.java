@@ -30,13 +30,18 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
     public void run() {
         while (!isTerminated) { // Only difference against FeedStockPriceRunnable - this has to keep reading from kafka until the app shuts down
             List<StockPrice> stockPrices = stockPriceReader.read();
+
+            /* Ideally we will execute batch inserts to increase throughput of Consumer.
+                But to demonstrate cases where consumer does heavy processing before asking kafka for next batch, I have added sleep after every 2 writes.
+                Hint : When you cannot consume at the rate the messages are produced, that is when you scale the consumer.
+             */
             for (int i = 0; i < stockPrices.size(); i++) {
                 stockPriceWriter.writeStockPrice(stockPrices.get(i));
                 if (i % 2 == 0) {
                     try {
                         // Intentionally slowing down the rate of consumption.
-                        LOGGER.info("Sync sleeping for every 2 price writes");
-                        Thread.sleep(3000);
+                        LOGGER.info("Sync sleeping for 2 seconds every 2 price writes");
+                        Thread.sleep(2000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
