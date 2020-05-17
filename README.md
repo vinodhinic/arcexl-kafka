@@ -332,8 +332,21 @@ Before we go ahead with further recipes, here is a brief overview of what we are
     ```
     * Do not waste too much time on this implementation. You need opencsv - version 5 or above - in order to parse dates to LocalDate. Copy the implementation from [FeedStockPriceReaderImpl](/record-replay/src/main/java/com/arcexl/reader/FeedStockPriceReaderImpl.java). You will also need few annotations at the [StockPrice](/record-replay/src/main/kotlin/com/arcexl/domain/StockPrice.kt) model.
 * Write a small program that reads from CSV using the `StockPriceReader` and writes to both DB and Kafka using `StockPriceWriter`
-* Use the `kafka-console-consumer` CLI to verify that the messages are produced
-
+* Use CLI commands to verify the kafka producer
+    * `kafka-console-consumer` CLI to verify that the messages are produced
+    
+    `bin\windows\kafka-console-consumer.bat --topic stockPriceTopic --bootstrap-server 127.0.0.1:9092 --from-beginning`
+    
+    * While the console-consumer is still active - i.e. don't kill it yet. Run consumer-groups
+    
+    `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --list`
+    
+    * In the list above, pick the one with groupId like "console-consumer-%"
+    
+    `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --group console-consumer-18941 --describe`
+    
+    * Observe that consumer group is "aware" of partitions within a topic. That is the reason why, in consumer, 
+    IBM gets displayed in order - i.e. starting from 2010 to 2020. i.e. within partition, the data is guaranteed to be in inserted order 
 ### Focus Points
 
 * Understand synchronous and asynchronous Kafka producer API.
