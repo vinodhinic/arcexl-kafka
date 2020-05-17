@@ -133,6 +133,8 @@ arcexl_prod=# create schema if not exists arcexl;
 
 ## Recipe 1 - Setting up a Spring project
 
+### Exercise
+
 * Set up spring dependencies in gradle
 * Add domain object for StockPrice
 ```
