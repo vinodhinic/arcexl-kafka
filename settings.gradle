@@ -1,5 +1,5 @@
 rootProject.name = 'arcexl-kafka'
-include 'setup'
+include 'setup', 'record-replay'
 
 rootProject.children.each { subproject ->
     subproject.buildFileName = "${subproject.name}.gradle"
