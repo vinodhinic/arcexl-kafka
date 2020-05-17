@@ -335,15 +335,15 @@ Before we go ahead with further recipes, here is a brief overview of what we are
 * Use CLI commands to verify the kafka producer
     * `kafka-console-consumer` CLI to verify that the messages are produced
     
-    `bin\windows\kafka-console-consumer.bat --topic stockPriceTopic --bootstrap-server 127.0.0.1:9092 --from-beginning`
+        `bin\windows\kafka-console-consumer.bat --topic stockPriceTopic --bootstrap-server 127.0.0.1:9092 --from-beginning`
     
     * While the console-consumer is still active - i.e. don't kill it yet. Run consumer-groups
     
-    `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --list`
+        `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --list`
     
     * In the list above, pick the one with groupId like "console-consumer-%"
     
-    `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --group console-consumer-18941 --describe`
+        `bin\windows\kafka-consumer-groups.bat --bootstrap-server 127.0.0.1:9092 --group console-consumer-18941 --describe`
     
     * Observe that consumer group is "aware" of partitions within a topic. That is the reason why, in consumer, 
     IBM gets displayed in order - i.e. starting from 2010 to 2020. i.e. within partition, the data is guaranteed to be in inserted order 
