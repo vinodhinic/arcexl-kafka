@@ -1,6 +1,27 @@
 # Kafka - Level 0
 This is recipe based training on Apache Kafka for ArcExL. Level-0 covers basic concepts of Kafka. KStreams and KConnect are out of scope for this training. 
 
+## Overview
+
+Here is a brief overview of what we are going to build.
+
+![Record-and-Replay](/docs/record_and_replay.png)
+
+1. StockPriceApp-Prod is going to read stock prices from Feeds - which is actually a csv [committed to the repo](/record-replay/src/main/resources/feeds.csv)
+1. StockPriceAdd-Prod writes these stock prices to prod-DB
+1. It also writes to stockPriceTopic at Kafka
+1. StockPriceApp-Uat is reading the stock prices from stockPriceTopic at Kafka
+1. StockPriceApp-Uat writes the stock prices read from kafka to uat-DB
+
+-------------
+
+## How the course is aligned
+
+* The incremental steps needed to build the application is modeled as **Recipe**
+* Each recipe has **Focus Points** - i.e. what you should learn out of building that recipe.
+* After every recipe or bunch of recipes, we have **Checkpoints** - i.e. Summary of everything you know about Kafka up until now. 
+We stop at each Checkpoint, drive the points home and THEN move on to further recipes. Because understanding these checkpoints are crucial for recipes that follow.
+
 ## Setup
 * IDE - We prefer that you work on Intellij
 * Gradle
@@ -292,20 +313,6 @@ Using the CLI Commands,
     * Hint: `--from-beginning`
 * Why the numbers are not in order?
     * Hint : Number of partitions you set for the test topic
-
--------------
-
-## Overview
-
-Before we go ahead with further recipes, here is a brief overview of what we are going to build
-
-![Record-and-Replay](/docs/record_and_replay.png)
-
-1. StockPriceApp-Prod is going to read stock prices from Feeds - which is actually a csv [committed to the repo](/record-replay/src/main/resources/feeds.csv)
-1. StockPriceAdd-Prod writes these stock prices to prod-DB
-1. It also writes to stockPriceTopic at Kafka
-1. StockPriceApp-Uat is reading the stock prices from stockPriceTopic at Kafka
-1. StockPriceApp-Uat writes the stock prices read from kafka to uat-DB
 
 -------------
 
