@@ -295,11 +295,15 @@ With installation, we have seen 2 major components of Kafka - Broker and Topics
 
 _You should understand broker, topic, partition, replication factor, Leader, ISR before going to the next step._
 
+<details>
+<summary>Visualizations</summary>
+
 ![Brokers And Topic](/docs/broker_topic_partitions.png)
 
 ![Topic replications](/docs/topic-replications.png)
 
 ![ISR](/docs/isr.png)
+</details>
 
 ### Exercise
 
