@@ -228,7 +228,7 @@ As few of you don't have Linux setup, I am explicitly doing Kafka Windows instal
 *Edit `server.properties` under `kafka/config`
 `log.dirs=C:/Users/chockali/Downloads/kafka/arcexlData/kafka` 
 * Open a new CMD window and Start Zookeeper
-`C:\Users\vino\Downloads\kafka>bin\windows\kafka-server-start.bat config\server.properties`
+`C:\Users\vino\Downloads\kafka>bin\windows\zookeeper-server-start.bat config\zookeeper.properties`
     * You should see that it is binding to port 2181
     
         ```[2020-05-17 01:23:56,813] INFO binding to port 0.0.0.0/0.0.0.0:2181 (org.apache.zookeeper.server.NIOServerCnxnFactory)```
