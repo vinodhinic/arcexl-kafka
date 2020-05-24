@@ -422,6 +422,9 @@ Recipe 4 - Consuming messages from Kafka
     * Each consumer within a group, reads from exclusive partitions.
     * If you have more consumers than partitions, some consumers will be inactive.
     * Data is read by consumer in order within each partition.
+    
+    ![Consumer groups](/docs/consumer-rebalancing.png)
+    
 * Kafka stores the offsets at which a consumer group has been reading.
     * This gets stored in topics named `__consumer_offsets`. Go to the `arcExlData/kafka` directory you created under kafka and take a look. You will see consumer_offsets along with `stockPriceTopic`
     * Who commits this offset?
@@ -438,4 +441,6 @@ Recipe 4 - Consuming messages from Kafka
         * none = throw exception when no offset is found
 * Multiple consumer groups can be reading from a topic. In that case, consumer offset for that topic is stored at Kafka for each consumer group.
 
-![Consumer groups](/docs/consumer-rebalancing.png)
+![Multiple consumer groups](/docs/new-consumer-group.png)
+
+----------------------------------------------------------------------------------------------------
