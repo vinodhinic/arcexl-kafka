@@ -13,7 +13,8 @@ import java.util.List;
 @Mapper
 public interface StockPriceMapper extends StockPriceDao {
 
-    @Insert("INSERT INTO stock_price(stock_symbol, date, price) VALUES ( #{stockSymbol}, #{date}, #{price} )")
+    @Insert("INSERT INTO stock_price(stock_symbol, date, price) VALUES ( #{stockSymbol}, #{date}, #{price} ) ON CONFLICT ON CONSTRAINT stock_price_pk DO " +
+            "UPDATE SET price = #{price}")
     void insertStockPrice(StockPrice stockPrice);
 
     @Select("SELECT stock_symbol AS stockSymbol, date, price FROM stock_price WHERE stock_symbol = #{stockSymbol} AND date = #{date}")

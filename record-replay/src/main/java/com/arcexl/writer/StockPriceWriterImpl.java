@@ -36,6 +36,8 @@ public class StockPriceWriterImpl implements StockPriceWriter {
         kafkaProducerProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServer);
         kafkaProducerProperties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         kafkaProducerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StockPriceSerializer.class.getName());
+        kafkaProducerProperties.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        kafkaProducerProperties.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
         this.kafkaProducer = new KafkaProducer<>(kafkaProducerProperties);
         this.writeStockPriceToKafka = writeStockPriceToKafka;
     }

@@ -228,7 +228,7 @@ As few of you don't have Linux setup, I am explicitly doing Kafka Windows instal
 *Edit `server.properties` under `kafka/config`
 `log.dirs=C:/Users/chockali/Downloads/kafka/arcexlData/kafka` 
 * Open a new CMD window and Start Zookeeper
-`C:\Users\vino\Downloads\kafka>bin\windows\kafka-server-start.bat config\server.properties`
+`C:\Users\vino\Downloads\kafka>bin\windows\zookeeper-server-start.bat config\zookeeper.properties`
     * You should see that it is binding to port 2181
     
         ```[2020-05-17 01:23:56,813] INFO binding to port 0.0.0.0/0.0.0.0:2181 (org.apache.zookeeper.server.NIOServerCnxnFactory)```
@@ -372,3 +372,183 @@ Using the CLI Commands,
 * Data is assigned randomly to a partition, unless a key is provided.
 
 --------------
+
+Recipe 4 - Consuming messages from Kafka
+--------------------------------------------------------------------- 
+
+### Exercise
+* Configure UAT profile with `writeStockPriceToKafka` property is set to false
+* If your table is not created with `stock_price_pk` constraint, add it now before proceeding with Kafka consumer. Refer the setup recipe.
+* Add another implementation for `StockPriceReader` to read from Kafka topic `stockPriceTopic`
+     ```
+        public interface StockPriceReader {
+            List<StockPrice> read();
+        }
+    ```
+* You would need to deserialize the message from kafka to `StockPrice` model. Again, as with Serializer, register `com.fasterxml.jackson.datatype.jsr310.JavaTimeModule` to `ObjectMapper` here as well.
+* Print the offset and partition when you consume a message.
+* Write a small program that reads from kafka using the above implementation `StockPriceReader` and writes to both DB and Kafka using `StockPriceWriter`
+* Test this program by verifying the records at UAT DB - Manual verification would do for now. We will come to adding end-to-end test case later.
+
+### Focus Points 
+* Rerun this program once again after it is done reading all messages from kafka. Observe what happens. Are you reading all messages in kafka from the beginning? That's not what you want right?
+    * Understand `AUTO_OFFSET_RESET_CONFIG` in Consumer Config.
+    * Understand `ENABLE_AUTO_COMMIT_CONFIG` in Consumer Config. What is the relevance of this property with respect to this Record and Replay application?
+* While writing the KafkaConsumer, you would have stumbled up on `GROUP_ID_CONFIG`. Understand what Consumer groups are.
+    * How can your UAT application identify itself as a certain consumer group?
+    * How many consumers can you run per group?
+    * What happens if there are multiple consumers per group?
+    * What does it take for a new application - say `Accounting Engine` to consume these stock prices from stockPriceTopic?
+
+### Checkpoint - Consumer & Consumer Groups
+
+* A consumer group can have multiple consumers.
+    * Each consumer within a group, reads from exclusive partitions.
+    * If you have more consumers than partitions, some consumers will be inactive.
+    * Data is read by consumer in order within each partition.
+* Kafka stores the offsets at which a consumer group has been reading.
+    * This gets stored in topics named `__consumer_offsets`. Go to the `arcExlData/kafka` directory you created under kafka and take a look. You will see consumer_offsets along with `stockPriceTopic`
+    * Who commits this offset?
+        * if you set `ENABLE_AUTO_COMMIT_CONFIG` to true, offsets are committed by kafka consumer automatically at an interval specified by another property called `AUTO_COMMIT_INTERVAL_MS_CONFIG`
+        * if not, you are supposed to explicitly invoke `consumer.commitSync()`. Sync or Async depends on your usecase. How important it is for you to know for sure the offset is committed before proceeding with your application logic.
+* `AUTO_OFFSET_RESET_CONFIG` is used when kafka does not have any committed offset for the consumer group id.
+    * There can be no committed offset at kafka when 
+        * your application went down before the auto-commit kicked off - this is when `ENABLE_AUTO_COMMIT_CONFIG` is set to true.
+        * Or when application goes down before it could get to the line where you have issued `consumer.commit`
+        * Or when consumer offset itself is deleted by Kafka. Note that the consumer offsets have retention property called `offsets.retention.minutes`. If this is set to, say 1 day, if kafka didn't see a consumer group active for a day, it will clear all the offsets for that group. This could mostly be the case for UAT/Dev application consumers since 1 day downtime is quite possible. 
+    * So when consumer starts, it needs to tell kafka how to reset offset, when there is no offset information for its consumer group. This can be :
+        * earliest = read from the start of the log
+        * latest = read from the end of the log. i.e. all messages that came in after the consumer subscribed to the topic
+        * none = throw exception when no offset is found
+* Multiple consumer groups can be reading from a topic. In that case, consumer offset for that topic is stored at Kafka for each consumer group.
+
+------------------------------------------
+
+## Recipe 5 - Scaling consumers
+
+### Exercise
+* Modify your application to be a long running - i.e. have the reader-writer continuously run.
+* At this point, you should have prod and uat profile setup. 
+    * Prod application should be reading from CSV and write to arcexl_prod db and kafka's stockPriceTopic
+    * Uat application should be reading from kafka's stockPriceTopic and write to arcexl_uat db
+* Add delay at writer when you are writing to kafka and reading from kafka.
+    * say prod application takes 3 seconds to produce 1 stock price 
+    * and uat application takes 20 seconds to consume a batch of stock price
+* Let's scale consumer now. Run Uat application -1  and after some time, run another instance of this uat application -2
+    * Observe the logs at uat-1 to see how consumer rebalancing happens.
+    * `stockPriceTopic` was created with 3 partitions. We have 2 consumers for this topic. You should one of the uat app reading from 2 partitions and other from just 1 partition.
+
+### FocusPoints
+* We could have let multiple threads poll from consumer right? Why didn't we do that? 
+    * Kafka consumers are not thread safe. One consumer per thread is the rule.
+* You would have already used `consumer.poll()` what is the parameter you pass to this poll()?
+    * How can you control the number of records returned from kafka for each poll? 
+* How does consumer establish liveliness with brokers?
+    * Note that a consumer can add to a group, leave a group, stay in a group but not consume anything.
+    * In this exercise, if uat-app-2 is killed, you would see all 3 partitioned assigned to uat-app-1. How/When does kafka know that a consumer died and that it needs to rebalance?  
+* What if there are too many messages for a topic that a single poll() at consumer brings down the uat-application due to sheer volume?
+    * What happens if your uat-app is not only reading from `stockPriceTopic` but also reading from another topic, say, `manualPriceTopic`? and this manualPriceTopic has 10x more partitions and 100x more messages per partition than `stockPriceTopic`?
+* What if there are no messages for a topic? Do we poll less frequently? If we don't poll often, can kafka think this consumer is dead?
+
+### Checkpoint - Other consumer properties
+* poll()
+    * The parameter we pass, poll(), is a timeout interval and controls how long poll() will block if data is not available in the consumer buffer.
+    * The first time you call poll() with a new consumer, it is responsible for finding the GroupCoordinator, joining the consumer group, and receiving a partition assignment. 
+    * `MAX.POLL.RECORDS` - This controls the maximum number of records that a single call to poll() will return. 
+        This is useful to help control the amount of data your application will need to process in the polling loop.
+    * i.e. if you pass 2 seconds to poll(), the call returns when either of the following happens - 2 seconds passed or when `MAX.POLL.RECORDS` are returned from kafka.
+    * `FETCH.MIN.BYTES` -  specify the minimum amount of data that consumer wants to receive from the broker when fetching records. 
+        If a broker receives a request for records from a consumer, but the new records amount to fewer bytes than `fetch.min.bytes`, the broker will wait until more messages are available before sending the records back to the consumer.
+    * `FETCH.MAX.WAIT.MS` :
+        * By setting `fetch.min.bytes`, consumer tell Kafka to wait until it has enough data to send before responding to the consumer. 
+        * `fetch.max.wait.ms` lets consumer control how long Kafka broker should wait. 
+        * By default, Kafka will wait up to 500 ms. This results in up to 500 ms of extra latency in case there is not enough data flowing to the Kafka topic to satisfy the minimum amount of data to return. 
+        If you want to limit the potential latency (usually due to SLAs controlling the maximum latency of the application), you can set `fetch.max.wait.ms` to a lower value. 
+        If you set fetch.max.wait.ms to 100 ms and fetch.min.bytes to 1 MB, Kafka will receive a fetch request from the consumer and will respond with data either when it has 1 MB of data to return or after 100 ms, whichever happens first.
+    * Note that consumer.poll() can returns for as many as topics you have subscribed that consumer to. You need a way to control the limit at partition level too.
+        * `MAX.PARTITION.FETCH.BYTES` -  The default is 1 MB, which means that when KafkaConsumer.poll() returns ConsumerRecords, the record object will use at most `max.partition.fetch.bytes` per partition assigned to the consumer.
+         So if a topic has 20 partitions, and you have 5 consumers, each consumer will need to have 4 MB of memory available for ConsumerRecords. 
+         In practice, you will want to allocate more memory as each consumer will need to handle more partitions if other consumers in the group fail. 
+         `max.partition.fetch.bytes` must be larger than the largest message a broker will accept (determined by the `max.message.bytes` property in the broker configuration), 
+         or the broker may have messages that the consumer will be unable to consume, in which case the consumer will hang trying to read them.
+    * `max.poll.interval.ms` - Maximum amount of time between 2 poll() calls before declaring the consumer dead.
+* `SESSION.TIMEOUT.MS` : The amount of time a consumer can be out of contact with the brokers while still considered alive defaults to 10 seconds. 
+If more than `session.timeout.ms` passes without the consumer sending a heartbeat to the group coordinator, it is considered dead and the group coordinator will trigger a rebalance of the consumer group 
+to allocate partitions from the dead consumer to the other consumers in the group. 
+    * This property is closely related to `heartbeat.interval.ms`. 
+    * `heartbeat.interval.ms` controls how frequently the KafkaConsumer poll() method will send a heartbeat to the group coordinator, whereas `session.timeout.ms` controls how long a consumer can go without sending a heartbeat. 
+    * Therefore, those two properties are typically modified together—`heartbeat.interval.ms` must be lower than `session.timeout.ms`, and is usually set to one-third of the timeout value. 
+    * So if `session.timeout.ms` is 3 seconds, `heartbeat.interval.ms` should be 1 second. 
+    * Another important consideration when setting `max.partition.fetch.bytes` is the amount of time it takes the consumer to process data. As you recall, the consumer must call poll() frequently enough to avoid session timeout and subsequent rebalance. If the amount of data a single poll() returns is very large, it may take the consumer longer to process, which means it will not get to the next iteration of the poll loop in time to avoid a session timeout. If this occurs, the two options are either to lower max.partition.fetch.bytes or to increase the session timeout.
+
+----------------------------------------------------------------------
+
+## Recipe 6 - Kafka guarantees
+
+This recipe is less of exercise and more of questions on what guarantee you expect out of kafka for this record-and-replay application.
+
+### FocusPoints/Checkpoint
+* There is a reason why I kept stressing on the `stock_price_pk` constraint. This means the producer should never send duplicate StockPrices.
+    * You can modify `FeedStockPriceReader` to make atomic read-writes. i.e. every record read from csv reader should be produced into Kafka.
+    * Say you have done that too. Is that enough? How do you know that a message you sent to kafka is not duplicated at brokers?
+    * Wait, what? Can that even happen?
+        * There are various producer guarantees - this is defined by `acks` - acknowledgements.
+        * When you send a message to kafka, do you care to get an ack back? if you look for fire and forget - i.e. at most once - then generally this property would be set to 0. This is ideal for log and metrics collectors
+        * But our application is a record and replay. So you care about acks. How much?
+        * There are 2 other levels
+            * acks=1 -> get the ack from the leader of the partition. but replication is not guaranteed (remember in-sync replicas?). If this leader goes down, your message is lost.
+            * acks=all -> get ack from leader and replicas. So If you set replication factor set to 5 for a topic, does this mean I block until I get ack from all 5 brokers? Wouldn't a few out of 5 be enough?
+                * Exactly. That is why we have `min.insync.replicas` broker properties (which can be overridden at topic properties as well)
+                * replication.factor=3, min.insync.replicas=2, acks=all -> this means you can only tolerate one broker going down, otherwise producer will receive an exception on send
+        * Is that all? No. Enter "Producer retries"
+            * Producer retries when the ack is not received. Say, due to network error, ack never reached the producer but the broker actually received the message. This could cause duplicates.
+        * Note that our app does not care about order. whether price-1 and price-2 reached in the same order at consumer. but if order matters to you, note that even successful retries could mess with the order.
+            * When you are sending msg-1 and msg-2, msg-2 succeeds but msg-1 is retried and eventually reaches broker - the order of message received at broker is msg-2, msg-1 eventhough you produced in order - msg-1, msg-2
+            * What can you do to prevent this? you need retries but tell producer not to send msg-2 until it received ack for msg-1. This is controlled by `max.in.flight.requests`
+        * So how to create an idempotent producer? Just set `enable.idempotence` to true at producer properties.
+            * Producer is intelligent enough to place "idempotent request" - this could be attaching a unique id to messages it retries so that broker can know that it already received the message.
+    * With the acks involved for strong producer guarantees, don't you think we should batch messages at producers? 
+        * When multiple records are sent to the same partition, the producer will batch them together. `batch.size` controls the amount of memory in bytes (not messages!) that will be used for each batch.
+        * `linger.ms` number of millis producer is willing to wait before sending a batch out - i.e. at the expense of adding a small delay, we are increasing the throughput of the producer.
+        * if batch is full (determined by `batch.size`) before the end of `linger.ms` it will be sent to kafka right away.
+        * if producer produces faster than the broker, records will be buffered in memory `buffer.memory`. If this buffer is full, send() method blocks. To prevent it from blocking indefinitely, we have `max.block.ms`
+    * Note that kafka-client api does a lot behind the scenes to ensure the stock prices are produced into topic to make it available for some UAT application.
+        * Would you really like to compromise your production resource (i.e. maintaining buffers for kafka producers, enabling retries, etc) for an UAT usecase?
+        * It is a good direction to think. Maybe you want to take these stock prices at non-critical hours and avail it to UAT applications. Think how you can enable that.
+
+* Let's focus on the consumer part now. Assume the upstream never sends you duplicate records. What can cause duplicate records at consumer side?
+    * There are 2 consumer commits - sync and async. 
+        * When you call consumer.commitSync() it commits the last offset read by consumer.poll() and it blocks until the commit succeeded.
+        * commitAsync() as name suggests, is non-blocking.  
+        * The drawback is that while commitSync() will retry the commit until it either succeeds or encounters a nonretriable failure, commitAsync() will not retry.
+        * But be careful when you put retry logic in commitAsync() callbacks. Imagine that we sent a request to commit offset 2000. There is a temporary communication problem, so the broker never gets the request and therefore never responds. Meanwhile, we processed another batch and successfully committed offset 3000. If commitAsync() now retries 
+        the previously failed commit, it might succeed in committing offset 2000 after offset 3000 was already processed and committed. In the case of a rebalance, this will cause more duplicates.
+    * Do we even need to call commit explicitly? or rely on auto commits?
+        * what if I read 4000 records from poll() and when I was inserting 3000th stock price, auto commit happened (which commits 4000 offset as last read) and uat-app crashes? Next time you poll, you get from 4001 and you lost 3000-4000.
+        * So definitely not going to rely on auto-commits
+    * There are apis to explicitly commit offset to a top and partition.
+        * So do we use explicitly commit after writing each record to DB? Note that you are blocking until the offset gets committed to kafka. That's definitely going to slow you down.
+        * Even with explicit offset commit, you could write a record to db and die before committing the offset to Kafka. It does not completely solve our problem.
+    * In our usecase, when will you commit the last read offset? Ideally when you know for sure that all records returned for the poll() went into uat-db.
+        * Write records one by one to uat DB and when all the records returned for that poll() went into uat-db, issue a consumer.commitSync()
+        ```
+        while(true) {
+            ConsumerRecords<String, StockPrice> consumerRecords = kafkaConsumer.poll(Duration.ofSeconds(2));
+              for (ConsumerRecord<String, StockPrice> consumerRecord : consumerRecords) {
+                  LOGGER.info("Read ConsumerRecord {} , partition {} and offset {} ", consumerRecord.value(), consumerRecord.partition()
+                          , consumerRecord.offset());
+                  stockPriceWriter.write(consumerRecord.value());
+              }
+              this.kafkaConsumer.commitSync();
+        }
+        ```
+        Say last committed offset = 1000. poll() returned 500 records - i.e from offset : 1001-1500. 
+        What happens when stockPriceWriter.write() failed for the 200th record of this 500 records? i.e. at offset 1200?
+        When app comes up, or when this partition gets rebalanced to another consumer, the last committed offset is 1000 and it will write the offset 1001 to 1199 again.
+        Hence, stockPriceWriter will fail because of this `stock_price_pk` constraint. 
+        
+        * To handle these cases, you need to make sure your consumer is idempotent - then tune kafka for at-least once guarantee.
+    * If you make your consumer idempotent, you can even rely on auto commits. Even commitAsync()
+    * Now make the uat-db writes idempotent.
+
+Conclusion : We expect at-least once guarantee from kafka since our consumers are idempotent.

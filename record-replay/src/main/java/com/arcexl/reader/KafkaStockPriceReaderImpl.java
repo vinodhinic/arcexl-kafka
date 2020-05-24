@@ -35,6 +35,10 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
         kafkaConsumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StockPriceDeserializer.class.getName());
         kafkaConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         kafkaConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
+        kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
+        kafkaConsumerProperties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "3000");
+        kafkaConsumerProperties.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "1000");
 
         kafkaConsumer = new KafkaConsumer<>(kafkaConsumerProperties);
         LOGGER.info("Subscribing to Topic {} as Consumer group {}", topicName, consumerGroupId);
@@ -42,7 +46,7 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
     }
 
     @Override
-    public List<StockPrice> read() {
+    public synchronized List<StockPrice> read() {
         List<StockPrice> stockPrices = new ArrayList<>();
 
         ConsumerRecords<String, StockPrice> consumerRecords = kafkaConsumer.poll(Duration.ofSeconds(2));
@@ -51,14 +55,12 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
                     , consumerRecord.offset());
             stockPrices.add(consumerRecord.value());
         }
-
         LOGGER.info("KafkaStockPriceReader read {} prices", stockPrices.size());
         return stockPrices;
     }
 
     @PreDestroy
     public void cleanUp() {
-        this.kafkaConsumer.commitSync();// Commit the offset before shutdown
         this.kafkaConsumer.close();
     }
 }
