@@ -295,6 +295,12 @@ With installation, we have seen 2 major components of Kafka - Broker and Topics
 
 _You should understand broker, topic, partition, replication factor, Leader, ISR before going to the next step._
 
+![Brokers And Topic](/docs/broker_topic_partitions.png)
+
+![Topic replications](/docs/topic-replications.png)
+
+![ISR](/docs/isr.png)
+
 ### Exercise
 
 Using the CLI Commands,
@@ -370,6 +376,8 @@ Using the CLI Commands,
 * Order is guaranteed only within a partition - not across partitions.
 * Once a data is written to a partition, it cannot be changed - Immutability.
 * Data is assigned randomly to a partition, unless a key is provided.
+
+![Topic Representation](/docs/topic-representation.png)
 
 --------------
 
