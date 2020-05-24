@@ -225,7 +225,7 @@ As few of you don't have Linux setup, I am explicitly doing Kafka Windows instal
     ```
 * Edit `zookeeper.properties` under `kafka/config` - Mind the forward slash
 `dataDir=C:/Users/vino/Downloads/kafka/arcexlData/zookeeper`
-*Edit `server.properties` under `kafka/config`
+* Edit `server.properties` under `kafka/config`
 `log.dirs=C:/Users/chockali/Downloads/kafka/arcexlData/kafka` 
 * Open a new CMD window and Start Zookeeper
 `C:\Users\vino\Downloads\kafka>bin\windows\zookeeper-server-start.bat config\zookeeper.properties`
@@ -372,3 +372,52 @@ Using the CLI Commands,
 * Data is assigned randomly to a partition, unless a key is provided.
 
 --------------
+
+Recipe 4 - Consuming messages from Kafka
+--------------------------------------------------------------------- 
+
+### Exercise
+* Configure UAT profile with `writeStockPriceToKafka` property is set to false
+* If your table is not created with `stock_price_pk` constraint, add it now before proceeding with Kafka consumer. Refer the setup recipe.
+* Add another implementation for `StockPriceReader` to read from Kafka topic `stockPriceTopic`
+     ```
+        public interface StockPriceReader {
+            List<StockPrice> read();
+        }
+    ```
+* You would need to deserialize the message from kafka to `StockPrice` model. Again, as with Serializer, register `com.fasterxml.jackson.datatype.jsr310.JavaTimeModule` to `ObjectMapper` here as well.
+* Print the offset and partition when you consume a message.
+* Write a small program that reads from kafka using the above implementation `StockPriceReader` and writes to both DB and Kafka using `StockPriceWriter`
+* Test this program by verifying the records at UAT DB - Manual verification would do for now. We will come to adding end-to-end test case later.
+
+### Focus Points 
+* Rerun this program once again after it is done reading all messages from kafka. Observe what happens. Are you reading all messages in kafka from the beginning? That's not what you want right?
+    * Understand `AUTO_OFFSET_RESET_CONFIG` in Consumer Config.
+    * Understand `ENABLE_AUTO_COMMIT_CONFIG` in Consumer Config. What is the relevance of this property with respect to this Record and Replay application?
+* While writing the KafkaConsumer, you would have stumbled up on `GROUP_ID_CONFIG`. Understand what Consumer groups are.
+    * How can your UAT application identify itself as a certain consumer group?
+    * How many consumers can you run per group?
+    * What happens if there are multiple consumers per group?
+    * What does it take for a new application - say `Accounting Engine` to consume these stock prices from stockPriceTopic?
+
+### Checkpoint - Consumer & Consumer Groups
+
+* A consumer group can have multiple consumers.
+    * Each consumer within a group, reads from exclusive partitions.
+    * If you have more consumers than partitions, some consumers will be inactive.
+    * Data is read by consumer in order within each partition.
+* Kafka stores the offsets at which a consumer group has been reading.
+    * This gets stored in topics named `__consumer_offsets`. Go to the `arcExlData/kafka` directory you created under kafka and take a look. You will see consumer_offsets along with `stockPriceTopic`
+    * Who commits this offset?
+        * if you set `ENABLE_AUTO_COMMIT_CONFIG` to true, offsets are committed by kafka consumer automatically at an interval specified by another property called `AUTO_COMMIT_INTERVAL_MS_CONFIG`
+        * if not, you are supposed to explicitly invoke `consumer.commitSync()`. Sync or Async depends on your usecase. How important it is for you to know for sure the offset is committed before proceeding with your application logic.
+* `AUTO_OFFSET_RESET_CONFIG` is used when kafka does not have any committed offset for the consumer group id.
+    * There can be no committed offset at kafka when 
+        * your application went down before the auto-commit kicked off - this is when `ENABLE_AUTO_COMMIT_CONFIG` is set to true.
+        * Or when application goes down before it could get to the line where you have issued `consumer.commit`
+        * Or when consumer offset itself is deleted by Kafka. Note that the consumer offsets have retention property called `offsets.retention.minutes`. If this is set to, say 1 day, if kafka didn't see a consumer group active for a day, it will clear all the offsets for that group. This could mostly be the case for UAT/Dev application consumers since 1 day downtime is quite possible. 
+    * So when consumer starts, it needs to tell kafka how to reset offset, when there is no offset information for its consumer group. This can be :
+        * earliest = read from the start of the log
+        * latest = read from the end of the log. i.e. all messages that came in after the consumer subscribed to the topic
+        * none = throw exception when no offset is found
+* Multiple consumer groups can be reading from a topic. In that case, consumer offset for that topic is stored at Kafka for each consumer group.
