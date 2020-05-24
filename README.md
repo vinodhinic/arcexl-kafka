@@ -300,7 +300,11 @@ _You should understand broker, topic, partition, replication factor, Leader, ISR
 
 ![Brokers And Topic](/docs/broker_topic_partitions.png)
 
+---------------------------
+
 ![Topic replications](/docs/topic-replications.png)
+
+---------------------------
 
 ![ISR](/docs/isr.png)
 </details>
