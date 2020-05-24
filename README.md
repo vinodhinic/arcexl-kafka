@@ -437,3 +437,5 @@ Recipe 4 - Consuming messages from Kafka
         * latest = read from the end of the log. i.e. all messages that came in after the consumer subscribed to the topic
         * none = throw exception when no offset is found
 * Multiple consumer groups can be reading from a topic. In that case, consumer offset for that topic is stored at Kafka for each consumer group.
+
+![Consumer groups](/docs/consumer-rebalancing.png)
