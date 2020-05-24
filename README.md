@@ -225,7 +225,7 @@ As few of you don't have Linux setup, I am explicitly doing Kafka Windows instal
     ```
 * Edit `zookeeper.properties` under `kafka/config` - Mind the forward slash
 `dataDir=C:/Users/vino/Downloads/kafka/arcexlData/zookeeper`
-*Edit `server.properties` under `kafka/config`
+* Edit `server.properties` under `kafka/config`
 `log.dirs=C:/Users/chockali/Downloads/kafka/arcexlData/kafka` 
 * Open a new CMD window and Start Zookeeper
 `C:\Users\vino\Downloads\kafka>bin\windows\zookeeper-server-start.bat config\zookeeper.properties`
@@ -294,6 +294,12 @@ With installation, we have seen 2 major components of Kafka - Broker and Topics
         * If B1 is down, then B2 can serve data. i.e B2 becomes leader for both P1 and P2
 
 _You should understand broker, topic, partition, replication factor, Leader, ISR before going to the next step._
+
+![Brokers And Topic](/docs/broker_topic_partitions.png)
+
+![Topic replications](/docs/topic-replications.png)
+
+![ISR](/docs/isr.png)
 
 ### Exercise
 
@@ -370,6 +376,8 @@ Using the CLI Commands,
 * Order is guaranteed only within a partition - not across partitions.
 * Once a data is written to a partition, it cannot be changed - Immutability.
 * Data is assigned randomly to a partition, unless a key is provided.
+
+![Topic Representation](/docs/topic-representation.png)
 
 --------------
 
@@ -552,3 +560,4 @@ This recipe is less of exercise and more of questions on what guarantee you expe
     * Now make the uat-db writes idempotent.
 
 Conclusion : We expect at-least once guarantee from kafka since our consumers are idempotent.
+
