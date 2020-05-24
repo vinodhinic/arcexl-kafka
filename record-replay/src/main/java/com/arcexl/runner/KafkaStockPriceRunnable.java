@@ -39,9 +39,9 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
                 stockPriceWriter.writeStockPrice(stockPrices.get(i));
                 if (i % 2 == 0) {
                     try {
-                        // Intentionally slowing down the rate of consumption.
-                        LOGGER.info("Sync sleeping for 2 ms every 2 price writes");
-                        Thread.sleep(200);
+                        // Intentionally slowing down the rate of consumption. Also using the MAX_POLL_RECORDS_CONFIG consumer property
+                        LOGGER.info("Sync sleeping for 2 seconds every 2 price writes");
+                        Thread.sleep(2000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }

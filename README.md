@@ -449,10 +449,10 @@ Recipe 4 - Consuming messages from Kafka
     * Uat application should be reading from kafka's stockPriceTopic and write to arcexl_uat db
 * Add delay at writer when you are writing to kafka and reading from kafka.
     * say prod application takes 3 seconds to produce 1 stock price 
-    * and uat application takes 20 seconds to consume a batch of stock price
+    * and uat application takes 20 seconds to consume a batch of stock price. You can also limit the batch size using `MAX_POLL_RECORDS_CONFIG`
 * Let's scale consumer now. Run Uat application -1  and after some time, run another instance of this uat application -2
     * Observe the logs at uat-1 to see how consumer rebalancing happens.
-    * `stockPriceTopic` was created with 3 partitions. We have 2 consumers for this topic. You should one of the uat app reading from 2 partitions and other from just 1 partition.
+    * `stockPriceTopic` was created with 3 partitions. We have 2 consumers for this topic. You should see one of the uat app reading from 2 partitions and other from just 1 partition.
 
 ### FocusPoints
 * We could have let multiple threads poll from consumer right? Why didn't we do that? 
