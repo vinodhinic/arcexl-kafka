@@ -35,10 +35,6 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
         kafkaConsumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StockPriceDeserializer.class.getName());
         kafkaConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         kafkaConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-        kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
-        kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
-        kafkaConsumerProperties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "3000");
-        kafkaConsumerProperties.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "1000");
 
         kafkaConsumer = new KafkaConsumer<>(kafkaConsumerProperties);
         LOGGER.info("Subscribing to Topic {} as Consumer group {}", topicName, consumerGroupId);
