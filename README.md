@@ -470,7 +470,16 @@ Recipe 4 - Consuming messages from Kafka
 * What if there are too many messages for a topic that a single poll() at consumer brings down the uat-application due to sheer volume?
     * What happens if your uat-app is not only reading from `stockPriceTopic` but also reading from another topic, say, `manualPriceTopic`? and this manualPriceTopic has 10x more partitions and 100x more messages per partition than `stockPriceTopic`?
 * What if there are no messages for a topic? Do we poll less frequently? If we don't poll often, can kafka think this consumer is dead?
-
+* Can you delete partitions from topic?
+* Can you scale by increasing partitions in a topic?
+    * Try altering partitions for `stockPriceTopic` and observe the CLI output.
+    
+        `bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --topic stockPriceTopic --alter --partitions 6`
+* How do you derive the number of partitions to be set per topic? Here are few questions to ask:
+    * What is the throughput you expect to achieve for the topic? For example, do you expect to write 100 KB per second or 1 GB per second?
+    * What is the maximum throughput you expect to achieve when consuming from a single partition? A partition will always be consumed completely by a single consumer.
+    * If you know that your slower consumer writes the data to a database and this database never handles more than 50 MB per second from each thread writing to it, then you know you are limited to 50 MB/sec throughput when consuming from a partition.
+    * So if I want to be able to write and read 1 GB/sec from a topic, and I know each consumer can only process 50 MB/s, then I know I need at least 20 partitions. This way, I can have 20 consumers reading from the topic and achieve 1 GB/sec.
 ### Checkpoint - Other consumer properties
 * poll()
     * The parameter we pass, poll(), is a timeout interval and controls how long poll() will block if data is not available in the consumer buffer.
@@ -501,6 +510,18 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     * Therefore, those two properties are typically modified together—`heartbeat.interval.ms` must be lower than `session.timeout.ms`, and is usually set to one-third of the timeout value. 
     * So if `session.timeout.ms` is 3 seconds, `heartbeat.interval.ms` should be 1 second. 
     * Another important consideration when setting `max.partition.fetch.bytes` is the amount of time it takes the consumer to process data. As you recall, the consumer must call poll() frequently enough to avoid session timeout and subsequent rebalance. If the amount of data a single poll() returns is very large, it may take the consumer longer to process, which means it will not get to the next iteration of the poll loop in time to avoid a session timeout. If this occurs, the two options are either to lower max.partition.fetch.bytes or to increase the session timeout.
+
+* Partitions cannot be deleted in a topic.
+* Partitions per topic can be increased but if you have a keyed partition, the guarantee that IBM key will always go to the same partition is lost
+
+    **From docs :**
+    ```
+    Be aware that one use case for partitions is to semantically partition data, and adding partitions doesn't change the partitioning 
+    of existing data so this may disturb consumers if they rely on that partition. 
+    That is if data is partitioned by hash(key) % number_of_partitions then this partitioning will potentially be shuffled by adding 
+    partitions but Kafka will not attempt to automatically redistribute data in any way.
+    ```
+* Avoid overestimating number of partitions per topic, as each partition uses memory and other resources on the broker and will increase the time for leader elections.
 
 ----------------------------------------------------------------------
 
@@ -533,6 +554,11 @@ This recipe is less of exercise and more of questions on what guarantee you expe
         * `linger.ms` number of millis producer is willing to wait before sending a batch out - i.e. at the expense of adding a small delay, we are increasing the throughput of the producer.
         * if batch is full (determined by `batch.size`) before the end of `linger.ms` it will be sent to kafka right away.
         * if producer produces faster than the broker, records will be buffered in memory `buffer.memory`. If this buffer is full, send() method blocks. To prevent it from blocking indefinitely, we have `max.block.ms`
+        * Let's revisit the point "Having too many partitions per topic"
+             * If one increases the number of partitions, message will be accumulated in more partitions in the producer (i.e. `batch.size`). The aggregate amount of memory used may now exceed 
+                the configured memory limit. When this happens, the producer has to either block or drop any new message, neither of which is ideal. To prevent this from happening, 
+                one will need to reconfigure the producer with a larger memory size.
+             * You can read more [here](https://www.confluent.io/blog/how-choose-number-topics-partitions-kafka-cluster/)
     * Note that kafka-client api does a lot behind the scenes to ensure the stock prices are produced into topic to make it available for some UAT application.
         * Would you really like to compromise your production resource (i.e. maintaining buffers for kafka producers, enabling retries, etc) for an UAT usecase?
         * It is a good direction to think. Maybe you want to take these stock prices at non-critical hours and avail it to UAT applications. Think how you can enable that.
@@ -574,4 +600,58 @@ This recipe is less of exercise and more of questions on what guarantee you expe
 
 Conclusion : We expect at-least once guarantee from kafka since our consumers are idempotent.
 
+----------------------------
 
+<ins>Here is another scenario :</ins>
+
+Consumer group A has read a message for a partition from its leader. Now the leader goes down before replicating the message to its replica. So this message, as far as brokers are concerned, is gone.
+But consumer group A has read it. If some other consumer group B is reading from the same topic, it won't see this message. Leading to inconsistency.
+
+To prevent this from happening, **not all the data that exists on the leader of the partition is available for clients to read**. Most clients can only read messages that were written to all in-sync replicas.
+
+This behavior also means that if replication between brokers is slow for some reason, it will take longer for new messages to arrive to consumers (since we wait for the messages to replicate first). This delay is limited to replica.lag.time.max.ms—the amount of time a replica can be delayed in replicating new messages while still being considered in-sync.
+
+![what can consumer see](/docs/watermark.png)
+
+Bonus : Read about `unclean.leader.election.enable` property and understand how you can make a choice between high availability and consistency
+
+--------------------------------
+ 
+## Recipe 7 : Data retention
+
+### Focus Points :
+
+* Notice how I have sneaked in keys way back at the producer recipe. Say it is day 2 of stockPrice-prod-app. uat instance was down for a day. I spin up stockPrice-uat-app on day 2
+    * Can I see all prices that was published by prod instance from day 1? 
+    * Spoiler alert : That depends on how often the compaction happens.  
+* Understand partitions and segments
+* How does kafka deal with ever growing partition?
+* Understand `log.cleanup.policy` and how it can affect your SLAs. Say accounting team now wants to consume this topic. What should they be aware of? If they start reading from offset "earliest", 
+are they going to see all prices for, say IBM? 
+* Decide what retention policy you would want to keep for this record-and-replay-application. 
+    * You need to know how often UAT instance will be down for maintenance (2 relevance - one if the offset retention at consumer offset topic and another is that if UAT is down for a day, 
+    you might not see few older messages published per key - this depends on compaction) 
+    * Now, do you need key while publishing the message?
+    
+### Checkpoint - WIP
+* Partition is made of segments(files)
+Partitions are made of segments -> files
+at any time there is only one active segment
+log.segment.bytes -> max size of single segment in bytes
+log.segment.ms -> time kafka will wait before closing segment if not full - 1 week
+
+Each segment has 2 indices -> position, timestamp
+
+small size per segments == more segments per partition == compaction more often
+
+log.cleanup.policy -> expiring data as per some policy -> 
+1. delete - 1 week/max size of log
+log.retention.hours - 1 week
+
+more hours mean == more disk space
+less means == only real time consumer can read data others would miss data
+
+2. compact
+
+how often does clean up happen? -> log.cleaner.backoff.ms 
+don't cleanup too often because it needs CPU and RAM
