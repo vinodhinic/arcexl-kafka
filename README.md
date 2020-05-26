@@ -461,9 +461,9 @@ Recipe 4 - Consuming messages from Kafka
 
 ### FocusPoints
 * We could have let multiple threads poll from consumer right? Why didn't we do that? 
-    * Kafka consumers are not thread safe. One consumer per thread is the rule.
+    * Kafka consumers are not thread safe. One consumer per thread is the rule. As long as each thread possess its own KafkaConsumer, we are good. Try that out as an exercise!
 * You would have already used `consumer.poll()` what is the parameter you pass to this poll()?
-    * How can you control the number of records returned from kafka for each poll? 
+    * How can you control the number of records returned from kafka for each poll? psst! you already know this
 * How does consumer establish liveliness with brokers?
     * Note that a consumer can add to a group, leave a group, stay in a group but not consume anything.
     * In this exercise, if uat-app-2 is killed, you would see all 3 partitioned assigned to uat-app-1. How/When does kafka know that a consumer died and that it needs to rebalance?  
@@ -510,7 +510,9 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     * Therefore, those two properties are typically modified together—`heartbeat.interval.ms` must be lower than `session.timeout.ms`, and is usually set to one-third of the timeout value. 
     * So if `session.timeout.ms` is 3 seconds, `heartbeat.interval.ms` should be 1 second. 
     * Another important consideration when setting `max.partition.fetch.bytes` is the amount of time it takes the consumer to process data. As you recall, the consumer must call poll() frequently enough to avoid session timeout and subsequent rebalance. If the amount of data a single poll() returns is very large, it may take the consumer longer to process, which means it will not get to the next iteration of the poll loop in time to avoid a session timeout. If this occurs, the two options are either to lower max.partition.fetch.bytes or to increase the session timeout.
-
+* Confused?
+    * https://stackoverflow.com/questions/51753883/increase-the-number-of-messages-read-by-a-kafka-consumer-in-a-single-poll/51755259
+    * https://stackoverflow.com/questions/39730126/difference-between-session-timeout-ms-and-max-poll-interval-ms-for-kafka-0-10-0
 * Partitions cannot be deleted in a topic.
 * Partitions per topic can be increased but if you have a keyed partition, the guarantee that IBM key will always go to the same partition is lost
 
@@ -522,7 +524,6 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     partitions but Kafka will not attempt to automatically redistribute data in any way.
     ```
 * Avoid overestimating number of partitions per topic, as each partition uses memory and other resources on the broker and will increase the time for leader elections.
-
 ----------------------------------------------------------------------
 
 ## Recipe 6 - Kafka guarantees
