@@ -444,3 +444,82 @@ Recipe 4 - Consuming messages from Kafka
 ![Multiple consumer groups](/docs/new-consumer-group.png)
 
 ----------------------------------------------------------------------------------------------------
+
+## Recipe 5 - Scaling consumers
+
+### Exercise
+* Modify your application to be a long running - i.e. have the reader-writer continuously run.
+* At this point, you should have prod and uat profile setup. 
+    * Prod application should be reading from CSV and write to arcexl_prod db and kafka's stockPriceTopic
+    * Uat application should be reading from kafka's stockPriceTopic and write to arcexl_uat db
+* Add delay at writer when you are writing to kafka and reading from kafka.
+    * say prod application takes 3 seconds to produce 1 stock price 
+    * and uat application takes 20 seconds to consume a batch of stock price. You can also limit the batch size using `MAX_POLL_RECORDS_CONFIG`
+* Let's scale consumer now. Run Uat application -1  and after some time, run another instance of this uat application -2
+    * Observe the logs at uat-1 to see how consumer rebalancing happens.
+    * `stockPriceTopic` was created with 3 partitions. We have 2 consumers for this topic. You should see one of the uat app reading from 2 partitions and other from just 1 partition.
+
+### FocusPoints
+* We could have let multiple threads poll from consumer right? Why didn't we do that? 
+    * Kafka consumers are not thread safe. One consumer per thread is the rule. As long as each thread possess its own KafkaConsumer, we are good. Try that out as an exercise!
+* You would have already used `consumer.poll()` what is the parameter you pass to this poll()?
+    * How can you control the number of records returned from kafka for each poll? psst! you already know this
+* How does consumer establish liveliness with brokers?
+    * Note that a consumer can add to a group, leave a group, stay in a group but not consume anything.
+    * In this exercise, if uat-app-2 is killed, you would see all 3 partitioned assigned to uat-app-1. How/When does kafka know that a consumer died and that it needs to rebalance?  
+* What if there are too many messages for a topic that a single poll() at consumer brings down the uat-application due to sheer volume?
+    * What happens if your uat-app is not only reading from `stockPriceTopic` but also reading from another topic, say, `manualPriceTopic`? and this manualPriceTopic has 10x more partitions and 100x more messages per partition than `stockPriceTopic`?
+* What if there are no messages for a topic? Do we poll less frequently? If we don't poll often, can kafka think this consumer is dead?
+* Can you delete partitions from topic?
+* Can you scale by increasing partitions in a topic?
+    * Try altering partitions for `stockPriceTopic` and observe the CLI output.
+    
+        `bin\windows\kafka-topics.bat --zookeeper 127.0.0.1:2181 --topic stockPriceTopic --alter --partitions 6`
+* How do you derive the number of partitions to be set per topic? Here are few questions to ask:
+    * What is the throughput you expect to achieve for the topic? For example, do you expect to write 100 KB per second or 1 GB per second?
+    * What is the maximum throughput you expect to achieve when consuming from a single partition? A partition will always be consumed completely by a single consumer.
+    * If you know that your slower consumer writes the data to a database and this database never handles more than 50 MB per second from each thread writing to it, then you know you are limited to 50 MB/sec throughput when consuming from a partition.
+    * So if I want to be able to write and read 1 GB/sec from a topic, and I know each consumer can only process 50 MB/s, then I know I need at least 20 partitions. This way, I can have 20 consumers reading from the topic and achieve 1 GB/sec.
+### Checkpoint - Other consumer properties
+* poll()
+    * The parameter we pass, poll(), is a timeout interval and controls how long poll() will block if data is not available in the consumer buffer.
+    * The first time you call poll() with a new consumer, it is responsible for finding the GroupCoordinator, joining the consumer group, and receiving a partition assignment. 
+    * `MAX.POLL.RECORDS` - This controls the maximum number of records that a single call to poll() will return. 
+        This is useful to help control the amount of data your application will need to process in the polling loop.
+    * i.e. if you pass 2 seconds to poll(), the call returns when either of the following happens - 2 seconds passed or when `MAX.POLL.RECORDS` are returned from kafka.
+    * `FETCH.MIN.BYTES` -  specify the minimum amount of data that consumer wants to receive from the broker when fetching records. 
+        If a broker receives a request for records from a consumer, but the new records amount to fewer bytes than `fetch.min.bytes`, the broker will wait until more messages are available before sending the records back to the consumer.
+    * `FETCH.MAX.WAIT.MS` :
+        * By setting `fetch.min.bytes`, consumer tell Kafka to wait until it has enough data to send before responding to the consumer. 
+        * `fetch.max.wait.ms` lets consumer control how long Kafka broker should wait. 
+        * By default, Kafka will wait up to 500 ms. This results in up to 500 ms of extra latency in case there is not enough data flowing to the Kafka topic to satisfy the minimum amount of data to return. 
+        If you want to limit the potential latency (usually due to SLAs controlling the maximum latency of the application), you can set `fetch.max.wait.ms` to a lower value. 
+        If you set fetch.max.wait.ms to 100 ms and fetch.min.bytes to 1 MB, Kafka will receive a fetch request from the consumer and will respond with data either when it has 1 MB of data to return or after 100 ms, whichever happens first.
+    * Note that consumer.poll() can returns for as many as topics you have subscribed that consumer to. You need a way to control the limit at partition level too.
+        * `MAX.PARTITION.FETCH.BYTES` -  The default is 1 MB, which means that when KafkaConsumer.poll() returns ConsumerRecords, the record object will use at most `max.partition.fetch.bytes` per partition assigned to the consumer.
+         So if a topic has 20 partitions, and you have 5 consumers, each consumer will need to have 4 MB of memory available for ConsumerRecords. 
+         In practice, you will want to allocate more memory as each consumer will need to handle more partitions if other consumers in the group fail. 
+         `max.partition.fetch.bytes` must be larger than the largest message a broker will accept (determined by the `max.message.bytes` property in the broker configuration), 
+         or the broker may have messages that the consumer will be unable to consume, in which case the consumer will hang trying to read them.
+    * `max.poll.interval.ms` - Maximum amount of time between 2 poll() calls before declaring the consumer dead.
+* `SESSION.TIMEOUT.MS` : The amount of time a consumer can be out of contact with the brokers while still considered alive defaults to 10 seconds. 
+If more than `session.timeout.ms` passes without the consumer sending a heartbeat to the group coordinator, it is considered dead and the group coordinator will trigger a rebalance of the consumer group 
+to allocate partitions from the dead consumer to the other consumers in the group. 
+    * This property is closely related to `heartbeat.interval.ms`. 
+    * `heartbeat.interval.ms` controls how frequently the KafkaConsumer poll() method will send a heartbeat to the group coordinator, whereas `session.timeout.ms` controls how long a consumer can go without sending a heartbeat. 
+    * Therefore, those two properties are typically modified together—`heartbeat.interval.ms` must be lower than `session.timeout.ms`, and is usually set to one-third of the timeout value. 
+    * So if `session.timeout.ms` is 3 seconds, `heartbeat.interval.ms` should be 1 second. 
+    * Another important consideration when setting `max.partition.fetch.bytes` is the amount of time it takes the consumer to process data. As you recall, the consumer must call poll() frequently enough to avoid session timeout and subsequent rebalance. If the amount of data a single poll() returns is very large, it may take the consumer longer to process, which means it will not get to the next iteration of the poll loop in time to avoid a session timeout. If this occurs, the two options are either to lower max.partition.fetch.bytes or to increase the session timeout.
+
+* Partitions cannot be deleted in a topic.
+* Partitions per topic can be increased but if you have a keyed partition, the guarantee that IBM key will always go to the same partition is lost
+
+    **From docs :**
+    ```
+    Be aware that one use case for partitions is to semantically partition data, and adding partitions doesn't change the partitioning 
+    of existing data so this may disturb consumers if they rely on that partition. 
+    That is if data is partitioned by hash(key) % number_of_partitions then this partitioning will potentially be shuffled by adding 
+    partitions but Kafka will not attempt to automatically redistribute data in any way.
+    ```
+* Avoid overestimating number of partitions per topic, as each partition uses memory and other resources on the broker and will increase the time for leader elections.
+-----------------------------
