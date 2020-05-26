@@ -510,7 +510,9 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     * Therefore, those two properties are typically modified together—`heartbeat.interval.ms` must be lower than `session.timeout.ms`, and is usually set to one-third of the timeout value. 
     * So if `session.timeout.ms` is 3 seconds, `heartbeat.interval.ms` should be 1 second. 
     * Another important consideration when setting `max.partition.fetch.bytes` is the amount of time it takes the consumer to process data. As you recall, the consumer must call poll() frequently enough to avoid session timeout and subsequent rebalance. If the amount of data a single poll() returns is very large, it may take the consumer longer to process, which means it will not get to the next iteration of the poll loop in time to avoid a session timeout. If this occurs, the two options are either to lower max.partition.fetch.bytes or to increase the session timeout.
-
+* Confused?
+    * https://stackoverflow.com/questions/51753883/increase-the-number-of-messages-read-by-a-kafka-consumer-in-a-single-poll/51755259
+    * https://stackoverflow.com/questions/39730126/difference-between-session-timeout-ms-and-max-poll-interval-ms-for-kafka-0-10-0
 * Partitions cannot be deleted in a topic.
 * Partitions per topic can be increased but if you have a keyed partition, the guarantee that IBM key will always go to the same partition is lost
 
