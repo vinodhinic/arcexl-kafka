@@ -11,9 +11,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/*
-    Since we are connecting to uat DB for test cases (for now). We need to clear test data after test method
- */
 @Sql(statements = {"delete from stock_price where stock_symbol like 'TEST%'"},
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 public class StockPriceJavaDaoTest extends BaseArcExlTest {

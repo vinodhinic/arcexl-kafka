@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PreDestroy;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,9 +36,13 @@ public class StockPriceRunner {
                                         LOGGER.error("Exception while stopping the Dedup Runner", e);
                                     }
                                 }));
+    }
+
+    public void start() {
         executorService.submit(stockPriceRunnable);
     }
 
+    @PreDestroy
     public void stop() throws InterruptedException {
         LOGGER.info("StockPriceRunner stop() invoked");
         this.stockPriceRunnable.shutdown();

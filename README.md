@@ -351,7 +351,7 @@ Using the CLI Commands,
         List<StockPrice> read();
     }
     ```
-    * Do not waste too much time on this implementation. You need opencsv - version 5 or above - in order to parse dates to LocalDate. Copy the implementation from [FeedStockPriceReaderImpl](/record-replay/src/main/java/com/arcexl/reader/FeedStockPriceReaderImpl.java). You will also need few annotations at the [StockPrice](/record-replay/src/main/kotlin/com/arcexl/domain/StockPrice.kt) model.
+    * Do not waste too much time on this implementation. You need opencsv - version 5 or above - in order to parse dates to LocalDate. Copy the implementation from [FeedStockPriceReaderImpl](/record-replay/src/main/java/com/arcexl/reader/FeedStockPriceReader.java). You will also need few annotations at the [StockPrice](/record-replay/src/main/kotlin/com/arcexl/domain/StockPrice.kt) model.
 * Write a small program that reads from CSV using the `StockPriceReader` and writes to both DB and Kafka using `StockPriceWriter`
 * Use CLI commands to verify the kafka producer
     * `kafka-console-consumer` CLI to verify that the messages are produced
@@ -524,4 +524,4 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     partitions but Kafka will not attempt to automatically redistribute data in any way.
     ```
 * Avoid overestimating number of partitions per topic, as each partition uses memory and other resources on the broker and will increase the time for leader elections.
------------------------------
+----------------------------------------------------------------------
