@@ -1,7 +1,7 @@
 package com.arcexl.runner;
 
 import com.arcexl.domain.StockPrice;
-import com.arcexl.reader.StockPriceReader;
+import com.arcexl.reader.KafkaStockPriceReader;
 import com.arcexl.writer.StockPriceWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +19,7 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
 
     @Autowired
     @Qualifier("kafkaStockPriceReader")
-    private StockPriceReader stockPriceReader;
+    private KafkaStockPriceReader kafkaStockPriceReader;
 
     private volatile boolean isTerminated = false;
 
@@ -29,7 +29,7 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
     @Override
     public void run() {
         while (!isTerminated) { // Only difference against FeedStockPriceRunnable - this has to keep reading from kafka until the app shuts down
-            List<StockPrice> stockPrices = stockPriceReader.read();
+            List<StockPrice> stockPrices = kafkaStockPriceReader.read();
 
             /* Ideally we will execute batch inserts to increase throughput of Consumer.
                 But to demonstrate cases where consumer does heavy processing before asking kafka for next batch, I have added sleep after every 2 writes.
@@ -47,6 +47,7 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
                     }
                 }
             }
+            kafkaStockPriceReader.commit();
         }
     }
 

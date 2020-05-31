@@ -13,12 +13,11 @@ import java.nio.file.Paths;
 import java.util.List;
 
 @Service("feedStockPriceReader")
-public class FeedStockPriceReaderImpl implements StockPriceReader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FeedStockPriceReaderImpl.class);
+public class FeedStockPriceReader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FeedStockPriceReader.class);
     @Value("${feed.filename}")
     private String fileName;
 
-    @Override
     public List<StockPrice> read() {
         try (Reader reader = Files.newBufferedReader(Paths.get(
                 ClassLoader.getSystemResource(fileName).toURI()))) {
