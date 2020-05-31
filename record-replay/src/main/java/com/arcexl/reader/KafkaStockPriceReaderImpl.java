@@ -35,7 +35,7 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
         kafkaConsumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StockPriceDeserializer.class.getName());
         kafkaConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
-        kafkaConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        kafkaConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         kafkaConsumer = new KafkaConsumer<>(kafkaConsumerProperties);
         LOGGER.info("Subscribing to Topic {} as Consumer group {}", topicName, consumerGroupId);
@@ -45,7 +45,13 @@ public class KafkaStockPriceReaderImpl implements StockPriceReader {
     @Override
     public synchronized List<StockPrice> read() {
         List<StockPrice> stockPrices = new ArrayList<>();
-
+        kafkaConsumer.commitAsync((offsets, exception) -> {
+            if (exception != null) {
+                LOGGER.error("Unable to commit {} due to {}", offsets, exception.getMessage());
+            } else {
+                LOGGER.info("Committed offsets for topics : {} ", offsets);
+            }
+        });
         ConsumerRecords<String, StockPrice> consumerRecords = kafkaConsumer.poll(Duration.ofSeconds(2));
         for (ConsumerRecord<String, StockPrice> consumerRecord : consumerRecords) {
             LOGGER.info("Read ConsumerRecord {} , partition {} and offset {} ", consumerRecord.value(), consumerRecord.partition()
