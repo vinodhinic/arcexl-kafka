@@ -1,5 +1,6 @@
 package com.arcexl;
 
+import com.arcexl.runner.StockPriceRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -15,8 +16,10 @@ public class StockPriceApplication {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StockPriceApplication.class);
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         ConfigurableApplicationContext applicationContext = SpringApplication.run(StockPriceApplication.class, args);
+        StockPriceRunner stockPriceRunner = applicationContext.getBean(StockPriceRunner.class);
+        stockPriceRunner.start();
         /*
          Stop button in your IDE does not send SIGTERM. https://youtrack.jetbrains.com/issue/CPP-3434
          Shutdown hooks work only for SIGTERM and not SIGKILL
