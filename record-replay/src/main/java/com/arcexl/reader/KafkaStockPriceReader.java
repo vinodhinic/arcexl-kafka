@@ -1,14 +1,14 @@
 package com.arcexl.reader;
 
 import com.arcexl.domain.StockPrice;
-import com.arcexl.writer.StockPriceDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,20 +25,10 @@ public class KafkaStockPriceReader {
 
     private final KafkaConsumer<String, StockPrice> kafkaConsumer;
 
-    public KafkaStockPriceReader(@Value("${kafka.bootstrap.server}") String kafkaBootstrapServer,
-                                 @Value("${stockPrice.consumer.group}") String consumerGroupId,
-                                 @Value("${kafka.topic.stock_price.name}") String topicName) {
-        Properties kafkaConsumerProperties = new Properties();
-        kafkaConsumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServer);
-        kafkaConsumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
-        kafkaConsumerProperties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        kafkaConsumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StockPriceDeserializer.class.getName());
-        kafkaConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        kafkaConsumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
-        kafkaConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-
+    public KafkaStockPriceReader(@Value("${kafka.topic.stock_price.name}") String topicName,
+                                 @Autowired @Qualifier("kafkaConsumerProperties") Properties kafkaConsumerProperties) {
         kafkaConsumer = new KafkaConsumer<>(kafkaConsumerProperties);
-        LOGGER.info("Subscribing to Topic {} as Consumer group {}", topicName, consumerGroupId);
+        LOGGER.info("Subscribing to Topic {} as Consumer group {}", topicName, kafkaConsumerProperties.get(ConsumerConfig.GROUP_ID_CONFIG));
         kafkaConsumer.subscribe(List.of(topicName));
     }
 

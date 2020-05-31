@@ -3,12 +3,11 @@ package com.arcexl.writer;
 import com.arcexl.dao.StockPriceDao;
 import com.arcexl.domain.StockPrice;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -29,15 +28,9 @@ public class StockPriceWriterImpl implements StockPriceWriter {
     @Value("${kafka.topic.stock_price.name}")
     private String topicName;
 
-    public StockPriceWriterImpl(@Value("${kafka.bootstrap.server}") String kafkaBootstrapServer,
-                                @Value("${writeStockPriceToKafka}") Boolean writeStockPriceToKafka) {
+    public StockPriceWriterImpl(@Value("${writeStockPriceToKafka}") Boolean writeStockPriceToKafka,
+                                @Autowired @Qualifier("kafkaProducerProperties") Properties kafkaProducerProperties) {
         LOGGER.info("StockPriceWriter initialized with writeStockPriceToKafka : {}", writeStockPriceToKafka);
-        Properties kafkaProducerProperties = new Properties();
-        kafkaProducerProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServer);
-        kafkaProducerProperties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        kafkaProducerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StockPriceSerializer.class.getName());
-        kafkaProducerProperties.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        kafkaProducerProperties.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
         this.kafkaProducer = new KafkaProducer<>(kafkaProducerProperties);
         this.writeStockPriceToKafka = writeStockPriceToKafka;
     }

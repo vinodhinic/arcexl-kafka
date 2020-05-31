@@ -54,6 +54,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
     testImplementation "org.testcontainers:postgresql:1.14.3"
+    testImplementation "org.testcontainers:kafka:1.14.3"
 }
 
 test {
