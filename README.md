@@ -555,13 +555,13 @@ to allocate partitions from the dead consumer to the other consumers in the grou
                 * replication.factor=3, min.insync.replicas=2, acks=all -> this means you can only tolerate one broker going down, otherwise producer will receive an exception on send
         * Is that all? No. Enter "Producer retries"
             * Producer retries when the ack is not received. Say, due to network error, ack never reached the producer but the broker actually received the message. This could cause duplicates.
-            [!dups-due-to-network-error](/docs/dups-due-to-network-error.png)
+            ![dups-due-to-network-error](/docs/dups-due-to-network-error.png)
         * Note that our app does not care about order. whether price-1 and price-2 reached in the same order at consumer. but if order matters to you, note that even successful retries could mess with the order.
             * When you are sending msg-1 and msg-2, msg-2 succeeds but msg-1 is retried and eventually reaches broker - the order of message received at broker is msg-2, msg-1 eventhough you produced in order - msg-1, msg-2
             * What can you do to prevent this? you need retries but tell producer not to send msg-2 until it received ack for msg-1. This is controlled by `max.in.flight.requests`
         * So how to create an idempotent producer? Just set `enable.idempotence` to true at producer properties.
             * Producer is intelligent enough to place "idempotent request" - this could be attaching a unique id to messages it retries so that broker can know that it already received the message.
-            [!idempotent-producer](/docs/idempotent-producer.png)
+            ![idempotent-producer](/docs/idempotent-producer.png)
     * With the acks involved for strong producer guarantees, don't you think we should batch messages at producers? 
         * When multiple records are sent to the same partition, the producer will batch them together. `batch.size` controls the amount of memory in bytes (not messages!) that will be used for each batch.
         * `linger.ms` number of millis producer is willing to wait before sending a batch out - i.e. at the expense of adding a small delay, we are increasing the throughput of the producer.
@@ -586,7 +586,7 @@ to allocate partitions from the dead consumer to the other consumers in the grou
     * Do we even need to call commit explicitly? or rely on auto commits?
         * what if I read 4000 records from poll() and when I was inserting 3000th stock price, auto commit happened (which commits 4000 offset as last read) and uat-app crashes? Next time you poll, you get from 4001 and you lost 3000-4000.
         * So definitely not going to rely on auto-commits
-        [!at-most-once-consumer](/docs/at-most-once.png)
+        ![at-most-once-consumer](/docs/at-most-once.png)
     * There are apis to explicitly commit offset to a topic and partition.
         * So do we use explicitly commit after writing each record to DB? Note that you are blocking until the offset gets committed to kafka. That's definitely going to slow you down.
         * Even with explicit offset commit, you could write a record to db and die before committing the offset to Kafka. It does not completely solve our problem.
@@ -609,7 +609,7 @@ to allocate partitions from the dead consumer to the other consumers in the grou
         Hence, stockPriceWriter will fail because of this `stock_price_pk` constraint. 
         
         * To handle these cases, you need to make sure your consumer is idempotent - then tune kafka for at-least once guarantee.
-        [!at-least-once-consumer](/docs/at-least-once.png)
+        ![at-least-once-consumer](/docs/at-least-once.png)
     * If you make your consumer idempotent, you can even rely on commitAsync()
     * Now make the uat-db writes idempotent.
 
