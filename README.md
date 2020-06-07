@@ -212,6 +212,7 @@ Name : setup
 * Check out the DAO Implementation at kotlin - delegate pattern
 * Mybatis annotation mappers
 * Flyway
+* Note that the kafka-client used in the application should be compatible with the kafka broker version (that you will install in next recipe)
 
 Note that it is not 100% kotlin. I don't want to add another learning curve here. If you already know a little Kotlin, some features I have used here would be an useful reference to you.
 **It is not mandatory to stick to the module provided here**. All we need at this point, is to have an application that connects to prod/uat db based on the profile and supports read/write dao on stock_price table.  
@@ -501,6 +502,9 @@ Recipe 4 - Consuming messages from Kafka
     * What is the maximum throughput you expect to achieve when consuming from a single partition? A partition will always be consumed completely by a single consumer.
     * If you know that your slower consumer writes the data to a database and this database never handles more than 50 MB per second from each thread writing to it, then you know you are limited to 50 MB/sec throughput when consuming from a partition.
     * So if I want to be able to write and read 1 GB/sec from a topic, and I know each consumer can only process 50 MB/s, then I know I need at least 20 partitions. This way, I can have 20 consumers reading from the topic and achieve 1 GB/sec.
+    
+* In this particular usecase, if you keep creating more uat instances, at certain point your local postgres would have complained "max connections reached". This is a nice reminder that scaling the application alone is not enough. Here your Uat-DB would become a bottleneck.
+ 
 ### Checkpoint - Other consumer properties
 * poll()
     * The parameter we pass, poll(), is a timeout interval and controls how long poll() will block if data is not available in the consumer buffer.
