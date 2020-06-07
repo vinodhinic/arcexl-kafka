@@ -47,7 +47,9 @@ public class KafkaStockPriceRunnable implements StockPriceRunnable {
                     }
                 }
             }
-            kafkaStockPriceReader.commit();
+            if (!stockPrices.isEmpty()) {
+                kafkaStockPriceReader.commit();
+            }
         }
     }
 
