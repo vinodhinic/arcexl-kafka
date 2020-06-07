@@ -22,7 +22,22 @@ Here is a brief overview of what we are going to build.
 * After every recipe or bunch of recipes, we have **Checkpoints** - i.e. Summary of everything you know about Kafka up until now. 
 We stop at each Checkpoint, drive the points home and THEN move on to further recipes. Because understanding these checkpoints are crucial for recipes that follow.
 
-## Setup
+----------------------------------
+
+## Table of contents
+1. [Development Environment](#toc-installation)
+1. [Project Setup](#toc-projectSetup)
+1. [Kafka Setup](#toc-kafka)
+1. [Kafka Producer](#toc-kafkaProducer)
+1. [Kafka Consumer](#toc-kafkaConsumer)
+1. [Scaling](#toc-scaling)
+1. [Guarantees](#toc-guarantees)
+1. [Retention](#toc-retention)
+
+------------------------------------
+
+<a name="toc-installation"></a>
+## Development Environment
 * IDE - We prefer that you work on Intellij
 * Gradle
 * Java 8 or above/Kotlin
@@ -152,6 +167,7 @@ arcexl_prod=# create schema if not exists arcexl;
 
 ---------
 
+<a name="toc-projectSetup"></a>
 ## Recipe 1 - Setting up a Spring project
 
 ### Exercise
@@ -200,8 +216,9 @@ Name : setup
 Note that it is not 100% kotlin. I don't want to add another learning curve here. If you already know a little Kotlin, some features I have used here would be an useful reference to you.
 **It is not mandatory to stick to the module provided here**. All we need at this point, is to have an application that connects to prod/uat db based on the profile and supports read/write dao on stock_price table.  
 
------------- 
-
+------------
+ 
+<a name="toc-kafka"></a>
 ## Recipe 2 - Setting up Kafka
 
 ### Installation & Creating Brokers
@@ -330,6 +347,7 @@ Using the CLI Commands,
 
 -------------
 
+<a name="toc-kafkaProducer"></a>
 ## Recipe 3 - Producing messages into Kafka
 
 ### Exercise
@@ -389,6 +407,8 @@ Using the CLI Commands,
 
 --------------
 
+<a name="toc-kafkaConsumer"></a>
+
 Recipe 4 - Consuming messages from Kafka
 --------------------------------------------------------------------- 
 
@@ -445,6 +465,7 @@ Recipe 4 - Consuming messages from Kafka
 
 ----------------------------------------------------------------------------------------------------
 
+<a name="toc-scaling"></a>
 ## Recipe 5 - Scaling consumers
 
 ### Exercise
@@ -526,6 +547,7 @@ to allocate partitions from the dead consumer to the other consumers in the grou
 * Avoid overestimating number of partitions per topic, as each partition uses memory and other resources on the broker and will increase the time for leader elections.
 ----------------------------------------------------------------------
 
+<a name="toc-guarantees"></a>
 ## Recipe 6 - Kafka guarantees
 
 * How can you enforce Strong Producer guarantees? - i.e. messages that an application produce, get into the broker.
@@ -632,6 +654,7 @@ Bonus : Read about `unclean.leader.election.enable` property and understand how 
 
 --------------------------------
  
+<a name="toc-retention"></a>
 ## Recipe 7 : Data retention
 
 ### Focus Points :
