@@ -631,3 +631,55 @@ This behavior also means that if replication between brokers is slow for some re
 Bonus : Read about `unclean.leader.election.enable` property and understand how you can make a choice between high availability and consistency
 
 --------------------------------
+ 
+## Recipe 7 : Data retention
+
+### Focus Points :
+
+* Notice how I have sneaked in keys way back at the producer recipe. Say it is day 2 of stockPrice-prod-app. uat instance was down for a day. I spin up stockPrice-uat-app on day 2
+    * Can I see all prices that was published by prod instance from day 1? 
+    * Spoiler alert : That depends on how often the compaction happens.  
+* Understand partitions and segments
+* How does kafka deal with ever growing partition?
+* Understand `log.cleanup.policy` and how it can affect your SLAs. Say accounting team now wants to consume this topic. What should they be aware of? If they start reading from offset "earliest", 
+are they going to see all prices for, say IBM? 
+* Decide what retention policy you would want to keep for this record-and-replay-application. 
+    * You need to know how often UAT instance will be down for maintenance (2 relevance - one if the offset retention at consumer offset topic and another is that if UAT is down for a day, 
+    you might not see few older messages published per key - this depends on compaction) 
+    * Now, do you need key while publishing the message?
+    
+### Checkpoint
+* Partition is made of segments(files)
+* There is only one active segment at any time per partition.
+    * log.segment.bytes -> max size of single segment in bytes
+    * log.segment.ms -> time kafka will wait before closing segment, if not full - defaults to 1 week
+* Each segment has 2 indices -> position, timestamp
+    * Indices help brokers quickly locate the message for a given offset hence enabling Kafka consumer to start fetching messages from _any_ available offset.  
+    This means that if a consumer asks for 1 MB messages starting at offset 100, the broker must be able to quickly locate the message for offset 100 (which can be in any of the segments for the partition) and start reading the messages from that offset on. 
+    * Index is maintained for each partition. It maps offsets to segment files and positions within the file.
+* Now revisit the point :  [More Partitions Requires More Open File Handles](https://www.confluent.io/blog/how-choose-number-topics-partitions-kafka-cluster/)   
+* `log.cleanup.policy` is policy with which kafka expires data - they can be delete/compact
+    * delete 
+        * log.retention.bytes - maximum size of the log before deleting it
+        * log.retention.(hours/minutes/ms) - 1 week
+        * more hours = more disk space
+        * less hours = only real time consumer can read data others would miss data            
+    * compaction 
+        * This is the process of retaining the latest message for the key. In our exercise, if we have 10 messages with key set to "IBM", only the last one would remain after compaction
+        ![Compaction](docs/compaction.png)
+        * Don't cleanup too often because compaction needs CPU and RAM
+        * Small size per segment = More segments per partition = Compaction happens more often
+        * `log.cleaner.enabled` property tells the broker to do compaction. This is enabled by default in recent versions.
+        * If we always keep the latest message for each key, what do we do when we really want to delete all messages for a specific key, such as if a user left our service and we are legally obligated to remove all traces of that user from our system?
+            * In order to delete a key from the system completely, not even saving the last message, the application must produce a message that contains that key and a null value. When the cleaner thread finds such a message, it will first do a normal compaction and retain only the message with the null value. It will keep this **tombstone** around for a configurable amount of time - `delete.retention.ms`
+        * Since we have set stockSymbol as key, after compaction only the latest, say, IBM price will be retained. Say, the feed source vends the prices in order (by date) you would ideally be expecting the latest price - say today's price.
+            * But, if you don't care about the order of messages, yesterday's price could be going to stored as latest message in kafka (due to retries). So revisit the guarantees and make sure the order of message produced at the producer is maintained.
+            * stockPriceSymbol is added as key to the record just for demonstration. It is not relevant for the application we have built.
+        * Ordering is kept intact. Compaction only removes some messages but does not re-order them
+        * Offset never changes. It is immutable. When messages is compacted, you would just find some missing - like 1,2,4,7,8
+        * Note that compaction does not prevent you from pushing duplicates to kafka. De-duplication is only done after a segment is committed. The real time consumer (i.e. the one reading from the tail of the log) would have still read all messages along with duplicates.
+        Consumer group that started reading the topic late, after the topic is compacted, would be reading latest value for each key. So never treat kafka compaction as deduplication strategy for your application.
+        
+        ![Compaction](docs/compaction-1.png) 
+             
+[Here is the nice summary on log retention and cleanup policies](https://medium.com/@sunny_81705/kafka-log-retention-and-cleanup-policies-c8d9cb7e09f8)

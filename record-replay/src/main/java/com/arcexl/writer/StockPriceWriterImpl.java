@@ -41,6 +41,7 @@ public class StockPriceWriterImpl implements StockPriceWriter {
             stockPriceDao.insertStockPrice(stockPrice);
 
             if (writeStockPriceToKafka) {
+                // key is added to the record only to demonstrate the partitions. Understand how these keys mapper when you come to the last recipe on data retention.
                 ProducerRecord<String, StockPrice> producerRecord = new ProducerRecord<>(topicName, stockPrice.getStockSymbol(), stockPrice);
 
                 // Producing message to Kafka is asynchronous. I have added a callback to print the response
