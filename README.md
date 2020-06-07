@@ -710,3 +710,12 @@ are they going to see all prices for, say IBM?
         ![Compaction](docs/compaction-1.png) 
              
 [Here is the nice summary on log retention and cleanup policies](https://medium.com/@sunny_81705/kafka-log-retention-and-cleanup-policies-c8d9cb7e09f8)
+
+---------------------------
+
+## References
+
+1. [Kafka - The definitive guide](https://www.confluent.io/resources/kafka-the-definitive-guide/)
+1. [Kafka - Learning Series](https://learning.oreilly.com/videos/apache-kafka-series/9781789342604)
+1. As always, [official documentation](https://kafka.apache.org/documentation/) - Make sure you are referring to the property of the Kafka broker version you are using
+1. The entire course gave little importance to monitoring, security, cluster setup, kafka admin operations. These could be your next steps.
