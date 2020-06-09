@@ -658,6 +658,7 @@ But consumer group A has read it. If some other consumer group B is reading from
 To prevent this from happening, **not all the data that exists on the leader of the partition is available for clients to read**. Most clients can only read messages that were written to all in-sync replicas.
 
 This behavior also means that if replication between brokers is slow for some reason, it will take longer for new messages to arrive to consumers (since we wait for the messages to replicate first). This delay is limited to replica.lag.time.max.ms—the amount of time a replica can be delayed in replicating new messages while still being considered in-sync.
+This also used to be based on the number of messages that a replica is allowed to be lagging behind the leader and still be considered in-sync - `replica.lag.max.messages`. but that [property is removed](https://www.confluent.io/blog/hands-free-kafka-replication-a-lesson-in-operational-simplicity/)
 
 ![what can consumer see](/docs/watermark.png)
 
