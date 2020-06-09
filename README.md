@@ -585,9 +585,16 @@ to allocate partitions from the dead consumer to the other consumers in the grou
         * Note that our app does not care about order. whether price-1 and price-2 reached in the same order at consumer. but if order matters to you, note that even successful retries could mess with the order.
             * When you are sending msg-1 and msg-2, msg-2 succeeds but msg-1 is retried and eventually reaches broker - the order of message received at broker is msg-2, msg-1 eventhough you produced in order - msg-1, msg-2
             * What can you do to prevent this? you need retries but tell producer not to send msg-2 until it received ack for msg-1. This is controlled by `max.in.flight.requests`
-        * So how to create an idempotent producer? Just set `enable.idempotence` to true at producer properties.
+        * So how to create an idempotent producer? Just set `enable.idempotence` to true at producer properties. 
+        
+            `To enable idempotence, the enable.idempotence configuration must be set to true. If set, the retries config will default to Integer.MAX_VALUE and the acks config will default to all.`
+            
             * Producer is intelligent enough to place "idempotent request" - this could be attaching a unique id to messages it retries so that broker can know that it already received the message.
             ![idempotent-producer](/docs/idempotent-producer.png)
+        * What happens if the KafkaProducer has sent a message and it is persisted to Kafka broker but before the acknowledgement is received by the producer, the producer is killed? 
+        Does it not duplicate if it is sent again after the restart?
+            
+            I cannot explain it any better than [this](https://stackoverflow.com/a/57907663/2256618). Note that the strategy would be different if you had multiple producers. There is also an option of transactional producer. But for our usecase, to save throughput, the simplest thing you can do is to make consumer idempotent. Read on. you will get there.
     * With the acks involved for strong producer guarantees, don't you think we should batch messages at producers? 
         * When multiple records are sent to the same partition, the producer will batch them together. `batch.size` controls the amount of memory in bytes (not messages!) that will be used for each batch.
         * `linger.ms` number of millis producer is willing to wait before sending a batch out - i.e. at the expense of adding a small delay, we are increasing the throughput of the producer.
