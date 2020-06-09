@@ -727,3 +727,4 @@ are they going to see all prices for, say IBM?
 1. [Kafka - Learning Series](https://learning.oreilly.com/videos/apache-kafka-series/9781789342604)
 1. As always, [official documentation](https://kafka.apache.org/documentation/) - Make sure you are referring to the documentation for the Kafka broker version you are using.
 1. The entire course gave little importance to monitoring, security, cluster setup, kafka admin operations. These could be your next steps.
+1. Also notice how I conveniently left kafka transactions out of the picture :wink: TBH I couldn't fit it into Level 0 but there are plenty of resources to learn `what` is exactly-once guarantee in Kafka and `how` it works. After acing THIS much of Kafka fundamentals, it should be fairly easy to grasp the concept. Do give it a try.
