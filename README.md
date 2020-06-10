@@ -587,7 +587,12 @@ to allocate partitions from the dead consumer to the other consumers in the grou
             * What can you do to prevent this? you need retries but tell producer not to send msg-2 until it received ack for msg-1. This is controlled by `max.in.flight.requests`
         * So how to create an idempotent producer? Just set `enable.idempotence` to true at producer properties. 
         
-            `To take advantage of the idempotent producer, it is imperative to avoid application level re-sends since these cannot be de-duplicated. As such, if an application enables idempotence, it is recommended to leave the retries config unset, as it will be defaulted to Integer.MAX_VALUE. Additionally, if a send(ProducerRecord) returns an error even with infinite retries (for instance if the message expires in the buffer before being sent), then it is recommended to shut down the producer and check the contents of the last produced message to ensure that it is not duplicated.`
+            ```
+            To enable idempotence, the enable.idempotence configuration must be set to true. 
+            If set, the retries config will default to Integer.MAX_VALUE and the acks config will default to all. 
+            To take advantage of the idempotent producer, it is imperative to avoid application level re-sends since these cannot be de-duplicated.
+            As such, if an application enables idempotence, it is recommended to leave the retries config unset, as it will be defaulted to Integer.MAX_VALUE. Additionally, if a send(ProducerRecord) returns an error even with infinite retries (for instance if the message expires in the buffer before being sent), then it is recommended to shut down the producer and check the contents of the last produced message to ensure that it is not duplicated.
+            ```
             
             * Producer is intelligent enough to place "idempotent request" - this could be attaching a unique id to messages it retries so that broker can know that it already received the message.
             ![idempotent-producer](/docs/idempotent-producer.png)
